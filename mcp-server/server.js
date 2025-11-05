@@ -13,7 +13,7 @@ app.use(express.json());
 
 const PORT = process.env.MCP_PORT || 5050;
 
-// 🔹 Tüm tool dosyalarını otomatik yükle
+//  Tüm tool dosyalarını otomatik yükle
 const tools = {};
 const toolsPath = path.join(process.cwd(), "tools");
 for (const file of fs.readdirSync(toolsPath)) {
@@ -30,11 +30,11 @@ app.post("/mcp/run", async (req, res) => {
     const result = await tools[tool].run(args || {});
     res.json({ result });
   } catch (error) {
-    console.error("❌ MCP Tool Error:", error);
+    console.error("MCP Tool Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 MCP + Figma Server running at http://localhost:${PORT}`);
+  console.log(` MCP + Figma Server running at http://localhost:${PORT}`);
 });

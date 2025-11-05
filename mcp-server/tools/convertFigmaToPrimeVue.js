@@ -1,4 +1,3 @@
-// mcp-server/tools/convertFigmaToPrimeVue.js
 import fetch from "node-fetch";
 
 export default {
@@ -22,7 +21,7 @@ export default {
 
     const figmaData = await fileRes.json();
 
-    // 🔹 Görsellerin ID’lerini al
+    //  Görsellerin ID’lerini al
     const imageNodeIds = [];
     const textNodes = [];
 
@@ -33,7 +32,7 @@ export default {
     }
     traverse(figmaData.document);
 
-    // 🔹 Görsel URL’lerini al
+    //  Görsel URL’lerini al
     let imageUrls = {};
     if (imageNodeIds.length > 0) {
       const imgRes = await fetch(
@@ -44,7 +43,7 @@ export default {
       imageUrls = imgJson.images || {};
     }
 
-    // 🔹 HTML + PrimeVue kodunu oluştur
+    //  HTML + PrimeVue kodunu oluştur
     const htmlParts = [];
 
     htmlParts.push(`<template>`);

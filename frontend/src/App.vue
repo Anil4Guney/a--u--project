@@ -16,9 +16,9 @@
       />
     </div>
 
-    <!-- 🧠 Kod çıktısı düzgün satır aralıklı şekilde -->
+    <!--  Kod çıktısı düzgün satır aralıklı şekilde -->
     <div v-if="response" class="mt-6">
-      <h2 class="text-xl font-semibold mb-2">🧩 Generated PrimeVue Code:</h2>
+      <h2 class="text-xl font-semibold mb-2"> Generated PrimeVue Code:</h2>
       <pre class="bg-gray-100 p-4 rounded text-sm border border-gray-300 overflow-x-auto">
 {{ formattedResponse }}
       </pre>
@@ -34,10 +34,10 @@ import InputText from "primevue/inputtext";
 const userInput = ref("");
 const response = ref("");
 
-// 🔹 Satır araları ve girintileri koru
+//  Satır araları ve girintileri koru
 const formattedResponse = computed(() => response.value);
 
-// 🔹 Figma dosyasını PrimeVue koduna dönüştür
+// Figma dosyasını PrimeVue koduna dönüştür
 async function convertFigma() {
   if (!userInput.value.trim()) {
     alert("Please enter a valid Figma File Key!");
@@ -82,7 +82,7 @@ pre {
   background: #f7f7f7;
   border-radius: 8px;
   padding: 12px;
-  white-space: pre-wrap; /* satır atlamaları korunsun */
-  color: #111; /* gri görünüyorsa bu metni siyaha çeker */
+  white-space: pre-wrap; 
+  color: #111; 
 }
 </style>

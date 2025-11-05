@@ -12,7 +12,6 @@ function extractFileKey(url) {
     if (m1) return m1[1];
     const m2 = url.match(/\/design\/([^\/\?\#]+)/);
     if (m2) return m2[1];
-    // fallback: query param ?file-id= or similar (rare)
     return null;
   } catch (e) { return null; }
 }
