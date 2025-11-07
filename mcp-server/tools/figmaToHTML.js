@@ -1,69 +1,69 @@
+import fs from "fs";
 import fetch from "node-fetch";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export default {
-  name: "figmaToHTML",
-  description: "Convert Figma file (text + image nodes) into formatted PrimeVue code",
-
+  name: "convertFigmaToHTML",
+  description: "Convert Figma design file to plain HTML + CSS",
   async run({ fileKey }) {
-    const token = process.env.FIGMA_API_KEY;
-    if (!fileKey || !token) {
-      throw new Error("Missing fileKey or FIGMA_API_KEY in environment.");
-    }
+    const key = fileKey || process.env.FIGMA_FILE_KEY;
+    const apiKey = process.env.FIGMA_API_KEY;
 
-    const fileRes = await fetch(`https://api.figma.com/v1/files/${fileKey}`, {
-      headers: { "X-Figma-Token": token },
+    if (!apiKey) throw new Error("❌ FIGMA_API_KEY .env içinde tanımlı değil!");
+
+    console.log("🎨 Figma verisi çekiliyor...");
+
+    const res = await fetch(`https://api.figma.com/v1/files/${key}`, {
+      headers: { "X-Figma-Token": apiKey },
     });
-    const fileData = await fileRes.json();
 
-    if (!fileRes.ok) {
-      throw new Error(`Figma API error (${fileRes.status}): ${JSON.stringify(fileData)}`);
+    if (!res.ok) {
+      throw new Error(`❌ Figma API hatası: ${res.statusText}`);
     }
 
-    const firstPage = fileData.document.children?.[0];
-    if (!firstPage) return { html: "No pages found in this Figma file." };
+    const data = await res.json();
+    console.log("✅ Figma dosyası alındı:", data.name);
 
-    const nodeIds = firstPage.children.map((n) => n.id).join(",");
-    const nodeRes = await fetch(
-      `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${nodeIds}`,
-      { headers: { "X-Figma-Token": token } }
-    );
-    const nodeData = await nodeRes.json();
+    // === TEXT, RECTANGLE, IMAGE katmanlarını HTML'e dönüştür ===
+    let html = `<div class="figma-container">\n`;
+    let css = `.figma-container { position: relative; min-height: 100vh; background: #f9f9f9; }\n`;
 
-    let htmlParts = [];
-    for (const node of Object.values(nodeData.nodes)) {
-      if (!node.document) continue;
-      const n = node.document;
-      if (n.type === "TEXT" && n.characters) {
-        htmlParts.push(`<p>${n.characters}</p>`);
-      } else if (n.fills?.[0]?.type === "IMAGE") {
-        htmlParts.push(`<img src="(image placeholder)" alt="${n.name}" />`);
-      } else if (n.type === "RECTANGLE" || n.type === "FRAME") {
-        htmlParts.push(`<div class="card">${n.name}</div>`);
+    function rgba(color) {
+      if (!color) return "transparent";
+      const r = Math.round(color.r * 255);
+      const g = Math.round(color.g * 255);
+      const b = Math.round(color.b * 255);
+      const a = color.a ?? 1;
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+
+    function traverse(node) {
+      const box = node.absoluteBoundingBox;
+      if (!box) return;
+
+      if (node.type === "RECTANGLE") {
+        html += `<div style="position:absolute; left:${box.x}px; top:${box.y}px; width:${box.width}px; height:${box.height}px; background:${rgba(node.fills?.[0]?.color)};"></div>\n`;
       }
+      if (node.type === "TEXT") {
+        const text = node.characters?.replace(/\n/g, "<br/>") || "";
+        html += `<p style="position:absolute; left:${box.x}px; top:${box.y}px; font-size:${node.style?.fontSize || 16}px; color:${rgba(node.fills?.[0]?.color)};">${text}</p>\n`;
+      }
+      if (node.fills?.some(f => f.type === "IMAGE")) {
+        html += `<img src="#" alt="Figma Image" style="position:absolute; left:${box.x}px; top:${box.y}px; width:${box.width}px; height:${box.height}px;">\n`;
+      }
+
+      if (node.children) node.children.forEach(traverse);
     }
 
-    // Formatlı ve okunabilir hale getir
-    const formattedHTML = htmlParts.join("\n    ");
+    traverse(data.document);
+    html += `</div>`;
 
-    const htmlOutput = `
-<template>
-  <div class="p-6 bg-gray-50">
-    ${formattedHTML}
-  </div>
-</template>
+    const outputPath = "output/figmaToHTML.html";
+    fs.writeFileSync(outputPath, html);
+    console.log(`✨ Dönüştürme tamamlandı! ➜ ${outputPath}`);
 
-<script setup>
-</script>
-
-<style scoped>
-.card {
-  border: 1px solid #ddd;
-  padding: 10px;
-  margin: 10px;
-}
-</style>
-`;
-
-    return { html: htmlOutput };
+    return { html, css };
   },
 };
