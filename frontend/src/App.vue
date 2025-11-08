@@ -2,14 +2,14 @@
   <div class="app-container p-6">
     <h1 class="text-2xl font-bold mb-4">Figma To HTML Converter</h1>
 
-    <div class="flex gap-2 mb-4">
+    <div class="chat-box flex gap-2 mt-4">
       <InputText
-        v-model="fileKey"
+        v-model="userInput"
         placeholder="Enter Figma File Key"
         class="input"
       />
       <Button
-        label="Convert"
+        label="Convert Figma → HTML"
         icon="pi pi-code"
         severity="success"
         @click="convertFigma"
@@ -18,7 +18,9 @@
 
     <div v-if="response" class="mt-6">
       <h2 class="text-xl font-semibold mb-2">Generated HTML:</h2>
-      <pre class="code-block">{{ response }}</pre>
+      <pre class="bg-gray-100 p-4 rounded text-sm border border-gray-300 overflow-x-auto">
+{{ response }}
+      </pre>
     </div>
   </div>
 </template>
@@ -28,11 +30,11 @@ import { ref } from "vue";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 
-const fileKey = ref("");
+const userInput = ref("");
 const response = ref("");
 
 async function convertFigma() {
-  if (!fileKey.value.trim()) {
+  if (!userInput.value.trim()) {
     alert("Please enter a valid Figma File Key!");
     return;
   }
@@ -43,7 +45,7 @@ async function convertFigma() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tool: "convertFigmaToHTML",
-        args: { fileKey: fileKey.value.trim() },
+        args: { fileKey: userInput.value.trim() },
       }),
     });
 
@@ -54,6 +56,7 @@ async function convertFigma() {
       response.value = JSON.stringify(data, null, 2);
     }
   } catch (err) {
+    console.error("Figma conversion error:", err);
     response.value = "Error: " + err.message;
   }
 }
@@ -67,13 +70,12 @@ async function convertFigma() {
 .input {
   width: 420px;
 }
-.code-block {
-  background: #f9f9f9;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
+pre {
   font-family: "Fira Code", monospace;
+  background: #f7f7f7;
+  border-radius: 8px;
+  padding: 12px;
   white-space: pre-wrap;
-  word-wrap: break-word;
+  color: #111;
 }
 </style>
