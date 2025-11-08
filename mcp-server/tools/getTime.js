@@ -1,4 +1,3 @@
-// mcp-server/tools/getTime.js
 export default {
   name: "getTime",
   description: "Return current server time (for tests).",

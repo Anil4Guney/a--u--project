@@ -13,7 +13,6 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(bodyParser.json());
 
-// --- Gemini Kurulumu ---
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   console.error("GEMINI_API_KEY bulunamadı. .env dosyasını kontrol et!");
@@ -22,12 +21,10 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-// --- MCP-Server Adresi ---
 const MCP_SERVER_URL = "http://localhost:5050/mcp/run";
 
 app.get("/", (req, res) => res.send("Gemini API backend çalışıyor!"));
 
-// --- YENİ ORKESTRATÖR YOLU ---
 app.post("/api/convert-figma", async (req, res) => {
   try {
     const { fileKey } = req.body;
@@ -35,7 +32,6 @@ app.post("/api/convert-figma", async (req, res) => {
       return res.status(400).json({ error: "fileKey gereklidir." });
     }
 
-    // ADIM 1: MCP-Server'dan ham HTML'i al
     console.log(`[Backend] MCP-Server'a istek atılıyor (fileKey: ${fileKey})`);
     const mcpResponse = await axios.post(MCP_SERVER_URL, {
       tool: "convertFigmaToHTML",
@@ -51,28 +47,26 @@ app.post("/api/convert-figma", async (req, res) => {
     }
     console.log(`[Backend] Ham HTML alındı (Uzunluk: ${rawHtml.length})`);
 
-    // ADIM 2: Gemini için prompt hazırla (TÜM SYNTAX Hataları Düzeltildi)
     const prompt = `
-      Aşağıda bir Figma tasarımından dönüştürülmüş, 'position: absolute' kullanan ham bir HTML kodu var.
+      Aşağıda bir Figma tasarımından 'Akıllı Ayrıştırıcı' ile dönüştürülmüş ham bir HTML kodu var.
+      Bu kod zaten 'display: flex' (Auto-Layout için) ve 'position: absolute' (sayfanın ana bölümleri için) karışımı içeriyor.
       Görevin:
-      1. Bu koddaki elemanların GÖRSEL DÜZENİNİ KORUYARAK 'position: absolute' stilini kaldırmayı dene.
-      2. Elemanların içeriğini (metin, resim linki vb.) KESİNLİKLE DEĞİŞTİRME.
-      3. Olmayan bir yapı (header, footer, sidebar gibi) SIFIRDAN UYDURMA. Sadece mevcut elemanları (\`div\`, \`p\`, \`img\`) yeniden düzenle.
-      4. CSS kodunu <style> etiketi içine al ve HTML'in <head> kısmına ekle.
-      5. Yalnızca ve yalnızca güncellenmiş HTML kodunu yanıt olarak döndür. 
-         Ekstra açıklama veya "İşte kodunuz:" gibi giriş cümleleri kullanma.
-         Markdown (\`\`\`html) etiketlerini kullanma. Sadece kodun kendisini döndür.
+      1. Bu koddaki 'position: absolute', 'left', 'top', 'right', 'bottom' gibi TÜM MUTLAK KONUMLANDIRMA stillerini KALDIR.
+      2. Bu elemanları (ana konteynerleri), normal bir web sayfasında olduğu gibi (örn. 'display: block' veya 'display: flex; flex-direction: column;') mantıklı bir şekilde alt alta akmasını sağla.
+      3. Kodun içinde 'display: flex' ile tanımlanmış (Auto-Layout'tan gelen) iç yapıları KORU.
+      4. Stilleri <head> içindeki <style> etiketlerine taşı.
+      5. Nihai HTML çıktısında ASLA 'position: absolute' bulunmamalıdır. Çıktı duyarlı (responsive) olmalıdır.
+      6. Yalnızca ve yalnızca bu talimatlara göre temizlenmiş, tam ve çalışır HTML kodunu yanıt olarak döndür. Ekstra açıklama veya markdown (\`\`\`html) kullanma.
 
       İşlenecek Ham HTML Kod:
       ${rawHtml}
     `;
 
-    // ADIM 3: Gemini'a gönder
     console.log("[Backend] Gemini'a iyileştirme için gönderiliyor...");
     const result = await geminiModel.generateContent(prompt);
     const reply = result.response.text();
 
-    // ADIM 4: İyileştirilmiş kodu Frontend'e Geri Gönder
+
     res.json({ optimizedHtml: reply });
 
   } catch (error) {
@@ -85,7 +79,6 @@ app.post("/api/convert-figma", async (req, res) => {
 });
 
 
-// --- Mevcut Gemini Chat Yolu (Değişiklik yok) ---
 app.post("/api/ask", async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -103,5 +96,5 @@ app.post("/api/ask", async (req, res) => {
 });
 
 app.listen(port, () =>
-  console.log(`🚀 Gemini Orkestratör Server http://localhost:${port} adresinde çalışıyor`)
+  console.log(` Gemini Orkestratör Server http://localhost:${port} adresinde çalışıyor`)
 );

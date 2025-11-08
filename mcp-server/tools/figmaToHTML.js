@@ -1,5 +1,3 @@
-// mcp-server/tools/figmaToHTML.js
-import fs from "fs";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 
@@ -7,83 +5,151 @@ dotenv.config();
 
 export default {
   name: "convertFigmaToHTML",
-  description: "Convert Figma design file to plain HTML + CSS",
+  description: "Figma'yı Auto-Layout'u anlayarak HTML'e dönüştürür.",
   async run({ fileKey }) {
     const key = fileKey || process.env.FIGMA_FILE_KEY;
     const apiKey = process.env.FIGMA_API_KEY;
 
-    if (!apiKey) throw new Error("❌ FIGMA_API_KEY .env içinde tanımlı değil!");
-    if (!key) throw new Error("❌ FIGMA_FILE_KEY belirtilmedi!");
-
-    console.log("... Figma verisi çekiliyor...");
+    if (!apiKey) throw new Error(" FIGMA_API_KEY .env içinde tanımlı değil!");
+    if (!key) throw new Error(" FIGMA_FILE_KEY belirtilmedi!");
 
     const res = await fetch(`https://api.figma.com/v1/files/${key}`, {
       headers: { "X-Figma-Token": apiKey },
     });
-
-    if (!res.ok) {
-      throw new Error(` Fignma API hatası: ${res.statusText}`);
-    }
+    if (!res.ok) throw new Error(` Figma API hatası: ${res.statusText}`);
 
     const data = await res.json();
-    console.log(" Figma dosyası alındı:", data.name);
+    const page = data.document.children?.[0];
+    if (!page) throw new Error("Figma belgesinde sayfa bulunamadı.");
 
-    let html = `<div class="figma-root">\n`;
-    let css = `.figma-root { position: relative; min-height: 100vh; overflow: hidden; }\n`;
-
-    function rgba(c) {
-      if (!c) return "transparent";
-      const { r, g, b, a } = c;
-      return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a ?? 1})`;
+    const pageBackground = rgba(page.backgroundColor);
+    
+    let childrenHtml = "";
+    if (page.children) {
+      page.children.forEach(node => {
+        childrenHtml += traverse(node, false); 
+      });
     }
 
-    function traverse(node) {
-      const box = node.absoluteBoundingBox;
-      if (!box) {
-         // Kutusu olmayan (örn. 'GROUP') elemanların çocuklarını yine de işle
-         if (node.children) node.children.forEach(traverse);
-         return;
-      }
-
-      // --- YENİ EKLENEN KISIM: FRAME (Çerçeve) ---
-      // FRAME'ler genellikle arka plan rengine sahiptir
-      if (node.type === "FRAME") {
-        html += `<div style="position:absolute; left:${box.x}px; top:${box.y}px; width:${box.width}px; height:${box.height}px; background:${rgba(node.fills?.[0]?.color)};"></div>\n`;
-      }
-      
-      if (node.type === "RECTANGLE") {
-        html += `<div style="position:absolute; left:${box.x}px; top:${box.y}px; width:${box.width}px; height:${box.height}px; background:${rgba(node.fills?.[0]?.color)};"></div>\n`;
-      }
-
-      if (node.type === "TEXT") {
-        const text = node.characters?.replace(/\n/g, "<br/>") || "";
-        const style = node.style;
-        html += `<p style="position:absolute; left:${box.x}px; top:${box.y}px; font-size:${style?.fontSize || 16}px; color:${rgba(node.fills?.[0]?.color)}; font-weight:${style?.fontWeight || 400};">${text}</p>\n`;
-      }
-
-      if (node.fills?.some(f => f.type === "IMAGE")) {
-        // Not: Bu, resim URL'sini almak için ek bir API çağrısı gerektirir, şimdilik yer tutucu bırakıyoruz.
-        html += `<img src="#" alt="Figma Image (URL not implemented)" style="position:absolute; left:${box.x}px; top:${box.y}px; width:${box.width}px; height:${box.height}px;">\n`;
-      }
-
-      // Çocuk elemanları da işle
-      if (node.children) node.children.forEach(traverse);
-    }
-
-    // --- DEĞİŞEN KISIM ---
-    // Tüm belge yerine sadece ilk sayfadan (children[0]) başla
-    if (data.document.children && data.document.children[0]) {
-        traverse(data.document.children[0]);
-    } else {
-        console.warn("Figma belgesinde sayfa bulunamadı.");
-    }
-
-    html += `</div>`;
-
-    const outputPath = "output/figmaToHTML.html";
-    fs.writeFileSync(outputPath, html);
-    console.log(` Dönüştürme tamamlandı! ➜ ${outputPath}`);
-
-    return { html, css }; // CSS'i şu an göndermiyoruz ama ileride kullanılabilir
+    const finalHtml = `<div class="figma-root" style="position: relative; min-height: 100vh; overflow: hidden; background: ${pageBackground};">\n${childrenHtml}\n</div>`;
+    
+    return { html: finalHtml, css: null }; 
   },
 };
+
+function traverse(node, isParentAutoLayout) {
+  if (node.visible === false || !node.absoluteBoundingBox) {
+    return "";
+  }
+
+  const styles = {};
+  let tag = 'div';
+  let content = '';
+  let attributes = '';
+  let hasChildren = node.children && node.children.length > 0;
+  
+  const box = node.absoluteBoundingBox;
+
+
+  const isThisNodeAutoLayout = node.layoutMode === 'HORIZONTAL' || node.layoutMode === 'VERTICAL';
+  
+  if (isParentAutoLayout) {
+    if (node.layoutGrow === 1) styles['flex-grow'] = 1;
+    if (node.layoutAlign === 'STRETCH') styles['align-self'] = 'stretch';
+    else {
+       styles['width'] = `${box.width}px`;
+       styles['height'] = `${box.height}px`;
+    }
+  } else {
+    styles['position'] = 'absolute';
+    styles['left'] = `${box.x}px`;
+    styles['top'] = `${box.y}px`;
+    styles['width'] = `${box.width}px`;
+    styles['height'] = `${box.height}px`;
+  }
+
+  // 2. Düzen (Auto-Layout)
+  if (isThisNodeAutoLayout) {
+    styles['display'] = 'flex';
+    styles['flex-direction'] = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
+    if (node.itemSpacing) styles['gap'] = `${node.itemSpacing}px`;
+    styles['padding'] = `${node.paddingTop || 0}px ${node.paddingRight || 0}px ${node.paddingBottom || 0}px ${node.paddingLeft || 0}px`;
+    styles['justify-content'] = mapAlign(node.primaryAxisAlignItems);
+    styles['align-items'] = mapAlign(node.counterAxisAlignItems);
+  }
+
+  if (node.fills && node.fills[0] && node.fills[0].type === 'SOLID') {
+    if (node.type !== 'TEXT') { 
+      styles['background-color'] = rgba(node.fills[0].color);
+    }
+  }
+  if (node.strokes && node.strokes[0] && node.strokes[0].type === 'SOLID') {
+     styles['border'] = `${node.strokeWeight || 1}px solid ${rgba(node.strokes[0].color)}`;
+  }
+  if (node.cornerRadius) styles['border-radius'] = `${node.cornerRadius}px`;
+  
+  if (node.type === 'TEXT') {
+    tag = 'p';
+    hasChildren = false; 
+    content = node.characters?.replace(/\n/g, "<br/>") || "";
+    if (node.style) {
+        styles['font-size'] = `${node.style.fontSize}px`;
+        styles['font-weight'] = node.style.fontWeight;
+        if (node.fills && node.fills[0] && node.fills[0].type === 'SOLID') {
+             styles['color'] = rgba(node.fills[0].color);
+        }
+    }
+  } 
+  else if (isImageNode(node)) {
+    tag = 'img';
+    hasChildren = false; 
+    const safeName = node.name.replace(/"/g, "'");
+    const fileName = node.name.toLowerCase()
+                        .replace(/[^a-z0-9\s-]/g, '') 
+                        .replace(/\s+/g, '-') 
+                        .replace(/^-|-$/g, ''); 
+    attributes = ` src="./images/${fileName || 'figma-export'}.png" alt="${safeName}" data-figma-name="${node.name}" `;
+  } 
+
+  const styleString = Object.entries(styles)
+                        .map(([key, value]) => `${key}: ${value};`)
+                        .join(' ');
+
+  let html = `<${tag} ${attributes} style="${styleString}">`;
+
+  if (hasChildren) {
+    node.children.forEach(child => {
+        html += traverse(child, isThisNodeAutoLayout); 
+    });
+  } else if (tag === 'p') {
+    html += content;
+  }
+
+  html += `</${tag}>`;
+  return html;
+}
+
+
+function rgba(c) {
+  if (!c) return "transparent";
+  const { r, g, b, a } = c;
+  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${a ?? 1})`;
+}
+
+function mapAlign(align) {
+  switch (align) {
+    case 'MIN': return 'flex-start';
+    case 'MAX': return 'flex-end';
+    case 'CENTER': return 'center';
+    case 'SPACE_BETWEEN': return 'space-between';
+    default: return 'flex-start'; 
+  }
+}
+
+function isImageNode(node) {
+    if (node.fills?.some(f => f.type === "IMAGE")) return true;
+    return node.type === "VECTOR" || 
+           node.type === "GROUP" || 
+           node.type === "COMPONENT" || 
+           node.type === "INSTANCE";
+}

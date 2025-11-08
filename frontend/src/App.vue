@@ -10,8 +10,7 @@
         @keyup.enter="convertFigma"
       />
       <Button
-        label="Convert Figma → AI HTML"
-        icon="pi pi-sparkles"
+        label="Convert Figma -> AI HTML"
         severity="success"
         @click="convertFigma"
         :loading="isLoading" 
@@ -45,26 +44,24 @@ import InputText from "primevue/inputtext";
 
 const userInput = ref("");
 const response = ref("");
-const isLoading = ref(false); // 1. Yüklenme durumu eklendi
-const error = ref(null); // 2. Hata durumu eklendi
+const isLoading = ref(false);
+const error = ref(null); 
 
 async function convertFigma() {
   if (!userInput.value.trim() || isLoading.value) {
     return;
   }
 
-  // İşlem başlıyor, arayüzü temizle
   isLoading.value = true;
   error.value = null;
   response.value = "";
 
   try {
-    // 3. YENİ URL: mcp-server (5050) yerine backend (5000) sunucusuna istek at
     const res = await fetch("http://localhost:5000/api/convert-figma", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        fileKey: userInput.value.trim(), // Sadece fileKey'i gönder
+        fileKey: userInput.value.trim(), 
       }),
     });
 
@@ -75,7 +72,6 @@ async function convertFigma() {
 
     const data = await res.json();
     
-    // 4. Gelen yanıt "optimizedHtml" olacak
     if (data.optimizedHtml) {
       response.value = data.optimizedHtml;
     } else {
@@ -84,10 +80,10 @@ async function convertFigma() {
 
   } catch (err) {
     console.error("Figma conversion error:", err);
-    error.value = err.message; // Hatayı ekrana bas
-    response.value = ""; // Başarısız olursa yanıtı temizle
+    error.value = err.message; 
+    response.value = ""; 
   } finally {
-    isLoading.value = false; // 5. İşlem bitince yüklenmeyi durdur
+    isLoading.value = false;
   }
 }
 </script>

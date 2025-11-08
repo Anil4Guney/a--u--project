@@ -1,4 +1,3 @@
-// mcp-server/server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -18,7 +17,7 @@ const tools = {};
 async function loadTools() {
   const toolsDir = path.resolve("./tools");
   if (!fs.existsSync(toolsDir)) {
-    console.warn("⚠️ tools dizini bulunamadı:", toolsDir);
+    console.warn(" tools dizini bulunamadı:", toolsDir);
     return;
   }
 
@@ -29,32 +28,27 @@ async function loadTools() {
       const moduleUrl = pathToFileURL(modulePath).href;
       const imported = await import(moduleUrl);
 
-      // desteklenen export biçimleri:
-      // 1) export default { name, run }
       if (imported.default && imported.default.name && typeof imported.default.run === "function") {
         tools[imported.default.name] = imported.default;
-        console.log(`🔹 Loaded tool: ${imported.default.name}`);
+        console.log(` Loaded tool: ${imported.default.name}`);
         continue;
       }
 
-      // 2) export const tool = { name, run }
       if (imported.tool && imported.tool.name && typeof imported.tool.run === "function") {
         tools[imported.tool.name] = imported.tool;
-        console.log(`🔹 Loaded tool: ${imported.tool.name}`);
+        console.log(` Loaded tool: ${imported.tool.name}`);
         continue;
       }
 
-      // 3) eski execute/exports biçimi (execute function)
       if (imported.name && typeof imported.execute === "function") {
-        // wrap into run
         tools[imported.name] = { name: imported.name, run: imported.execute, description: imported.description ?? "" };
-        console.log(`🔹 Loaded tool (execute): ${imported.name}`);
+        console.log(` Loaded tool (execute): ${imported.name}`);
         continue;
       }
 
-      console.warn(`⚠️ Skipped ${f}: no valid export (default/tool/execute) found.`);
+      console.warn(` Skipped ${f}: no valid export (default/tool/execute) found.`);
     } catch (err) {
-      console.error(`❌ Failed to load tool ${f}:`, err.message);
+      console.error(` Failed to load tool ${f}:`, err.message);
     }
   }
 }
@@ -70,7 +64,7 @@ app.post("/mcp/run", async (req, res) => {
     const result = await selected.run(args ?? {});
     return res.json({ result });
   } catch (err) {
-    console.error("❌ MCP Tool Error:", err);
+    console.error(" MCP Tool Error:", err);
     return res.status(500).json({ error: err.message ?? String(err) });
   }
 });
@@ -78,6 +72,6 @@ app.post("/mcp/run", async (req, res) => {
 (async () => {
   await loadTools();
   app.listen(PORT, () => {
-    console.log(`🚀 MCP + Figma Server running at http://localhost:${PORT}`);
+    console.log(` MCP + Figma Server running at http://localhost:${PORT}`);
   });
 })();
