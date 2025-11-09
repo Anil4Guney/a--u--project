@@ -50,7 +50,6 @@ function traverse(node, isParentAutoLayout) {
   
   const box = node.absoluteBoundingBox;
 
-
   const isThisNodeAutoLayout = node.layoutMode === 'HORIZONTAL' || node.layoutMode === 'VERTICAL';
   
   if (isParentAutoLayout) {
@@ -68,7 +67,6 @@ function traverse(node, isParentAutoLayout) {
     styles['height'] = `${box.height}px`;
   }
 
-  // 2. Düzen (Auto-Layout)
   if (isThisNodeAutoLayout) {
     styles['display'] = 'flex';
     styles['flex-direction'] = node.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
@@ -77,7 +75,7 @@ function traverse(node, isParentAutoLayout) {
     styles['justify-content'] = mapAlign(node.primaryAxisAlignItems);
     styles['align-items'] = mapAlign(node.counterAxisAlignItems);
   }
-
+  
   if (node.fills && node.fills[0] && node.fills[0].type === 'SOLID') {
     if (node.type !== 'TEXT') { 
       styles['background-color'] = rgba(node.fills[0].color);
@@ -104,12 +102,15 @@ function traverse(node, isParentAutoLayout) {
     tag = 'img';
     hasChildren = false; 
     const safeName = node.name.replace(/"/g, "'");
+
     const fileName = node.name.toLowerCase()
                         .replace(/[^a-z0-9\s-]/g, '') 
-                        .replace(/\s+/g, '-') 
-                        .replace(/^-|-$/g, ''); 
+                        .replace(/\s+/g, '-')         
+                        .replace(/^-|-$/g, '');        
     attributes = ` src="./images/${fileName || 'figma-export'}.png" alt="${safeName}" data-figma-name="${node.name}" `;
+    delete styles['background-color'];
   } 
+
 
   const styleString = Object.entries(styles)
                         .map(([key, value]) => `${key}: ${value};`)
