@@ -4,6 +4,7 @@ import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import axios from "axios"; 
+import prettier from "prettier"; 
 
 dotenv.config();
 
@@ -27,15 +28,16 @@ app.get("/", (req, res) => res.send("Gemini API backend çalışıyor!"));
 
 app.post("/api/convert-figma", async (req, res) => {
   try {
-    const { fileKey } = req.body;
+    const { fileKey, nodeId } = req.body; 
     if (!fileKey) {
       return res.status(400).json({ error: "fileKey gereklidir." });
     }
 
-    console.log(`[Backend] MCP-Server'a istek atılıyor (fileKey: ${fileKey})`);
+    console.log(`[Backend] MCP-Server'a istek atılıyor (fileKey: ${fileKey}, nodeId: ${nodeId || 'yok'})`);
+    
     const mcpResponse = await axios.post(MCP_SERVER_URL, {
       tool: "convertFigmaToHTML",
-      args: { fileKey: fileKey },
+      args: { fileKey: fileKey, nodeId: nodeId }, 
     });
 
     const rawHtml = mcpResponse.data.result?.html;
@@ -47,16 +49,21 @@ app.post("/api/convert-figma", async (req, res) => {
     }
     console.log(`[Backend] Ham HTML alındı (Uzunluk: ${rawHtml.length})`);
 
+    // --- GÜNCELLENMİŞ AI PROMPT'U ---
     const prompt = `
-      Aşağıda bir Figma tasarımından 'Akıllı Ayrıştırıcı' ile dönüştürülmüş ham bir HTML kodu var.
-      Bu kod zaten 'display: flex' (Auto-Layout için) ve 'position: absolute' (sayfanın ana bölümleri için) karışımı içeriyor.
-      Görevin:
-      1. Bu koddaki 'position: absolute', 'left', 'top', 'right', 'bottom' gibi TÜM MUTLAK KONUMLANDIRMA stillerini KALDIR.
-      2. Bu elemanları (ana konteynerleri), normal bir web sayfasında olduğu gibi (örn. 'display: block' veya 'display: flex; flex-direction: column;') mantıklı bir şekilde alt alta akmasını sağla.
-      3. Kodun içinde 'display: flex' ile tanımlanmış (Auto-Layout'tan gelen) iç yapıları KORU.
-      4. Stilleri <head> içindeki <style> etiketlerine taşı.
-      5. Nihai HTML çıktısında ASLA 'position: absolute' bulunmamalıdır. Çıktı duyarlı (responsive) olmalıdır.
-      6. Yalnızca ve yalnızca bu talimatlara göre temizlenmiş, tam ve çalışır HTML kodunu yanıt olarak döndür. Ekstra açıklama veya markdown (\`\`\`html) kullanma.
+      Aşağıda bir Figma dönüştürücüsünden gelen, 'inline styles' (style="...") ve 'base64' ile gömülmüş SVG ikonları içeren bir HTML kodu var.
+      Görevin bu kodu optimize etmek ve temizlemektir.
+      
+      TALİMATLAR:
+      1.  Bir <head> etiketi oluştur (veya mevcutsa onu kullan). İçine bir <meta charset="UTF-8">, <meta name="viewport" content="width=device-width, initial-scale=1.0"> ve bir <title> ekle.
+      2.  <head> içine bir <style> etiketi ekle.
+      3.  HTML body'sindeki TÜM 'inline style' özelliklerini (style="...") analiz et.
+      4.  Tekrar eden veya mantıksal olarak gruplanabilen (örn. .sidebar, .button, .list-item) stiller için ANLAMLI CSS SINIFLARI (class) oluştur.
+      5.  Tüm stilleri bu sınıflara taşıyarak <style> etiketinin içine yaz.
+      6.  Body içindeki HTML elemanlarından 'style="..."' özelliklerini kaldır ve yerlerine 'class="..."' özelliklerini ekle.
+      7.  HTML'in yapısını (<div>, <p> vb.) ve gömülü <img src="data:image/svg+xml;base64,..."> etiketlerini KORU. Onları değiştirme veya kaldırma.
+      8.  'figma-root' div'ine 'box-sizing: border-box;' ve genel olarak '*' seçicisine 'box-sizing: inherit;' eklemek iyi bir praktiktir.
+      9.  Yalnızca ve yalnızca bu talimatlara göre temizlenmiş, tam ve çalışır HTML kodunu yanıt olarak döndür. Ekstra açıklama veya markdown (\`\`\`html) kullanma.
 
       İşlenecek Ham HTML Kod:
       ${rawHtml}
@@ -66,8 +73,14 @@ app.post("/api/convert-figma", async (req, res) => {
     const result = await geminiModel.generateContent(prompt);
     const reply = result.response.text();
 
+    let cleanReply = reply.replace(/^```html\n?/i, "").replace(/```$/i, "");
 
-    res.json({ optimizedHtml: reply });
+    const formattedReply = await prettier.format(cleanReply, {
+      parser: "html",
+      printWidth: 100,
+    });
+
+    res.json({ optimizedHtml: formattedReply }); 
 
   } catch (error) {
     console.error("Dönüştürme hatası:", error.response?.data || error.message);
