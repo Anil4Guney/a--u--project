@@ -41,7 +41,7 @@
       <div class="flex justify-between items-center mb-2">
         <h2 class="text-xl font-semibold">Live Preview:</h2>
         <Button
-          label="Önizlemeyi Yeni Sekmede Aç"
+          label="Open Preview in New Tab"
           severity="info"
           @click="openPreviewInNewTab"
           class="p-button-sm"
