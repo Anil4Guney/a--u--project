@@ -6,8 +6,7 @@ dotenv.config();
 const FIGMA_API_KEY = process.env.FIGMA_API_KEY;
 if (!FIGMA_API_KEY) throw new Error(" FIGMA_API_KEY .env içinde tanımlı değil!");
 
-// --- YENİ: CSS Stillerini depolamak için ---
-// cssStore[".node-1-2"] = "color: #FFF; font-size: 16px;"
+// --- CSS Stillerini depolamak için ---
 let cssStore = {};
 
 export default {
@@ -35,7 +34,7 @@ export default {
           isRootNodeAutoLayout, 
           isRootNodeAutoLayout ? rootNode.layoutMode : null, // parentLayoutMode
           rootNode.absoluteBoundingBox, 
-          isRootNodeAutoLayout ? rootNode.absoluteBoundingBox : null // autoLayoutParentBox DÜZELTME
+          isRootNodeAutoLayout ? rootNode.absoluteBoundingBox : null // autoLayoutParentBox
         ); 
       });
     }
@@ -97,10 +96,13 @@ async function getFigmaNode(key, nodeId) {
   }
 }
 
+// --- YENİDEN YAZILMIŞ getRootStyles FONKSİYONU ---
 function getRootStyles(rootNode, isRootNodeAutoLayout) {
   const styles = {};
   styles['position'] = 'relative';
   styles['overflow'] = 'hidden';
+  styles['margin'] = 'auto'; // Konteynırı her zaman ortala
+
   if (rootNode.fills && rootNode.fills[0] && rootNode.fills[0].type === 'SOLID') {
     styles['background'] = rgba(rootNode.fills[0].color);
   } else if (rootNode.backgroundColor) {
@@ -110,6 +112,7 @@ function getRootStyles(rootNode, isRootNodeAutoLayout) {
   }
   
   if (isRootNodeAutoLayout) {
+      // --- Auto-Layout Kök Öğesi (Finance Projesi gibi) ---
       styles['display'] = 'flex';
       styles['flex-direction'] = rootNode.layoutMode === 'HORIZONTAL' ? 'row' : 'column';
       if (rootNode.itemSpacing) styles['gap'] = `${rootNode.itemSpacing}px`;
@@ -117,35 +120,35 @@ function getRootStyles(rootNode, isRootNodeAutoLayout) {
       styles['justify-content'] = mapAlign(rootNode.primaryAxisAlignItems);
       styles['align-items'] = mapAlign(rootNode.counterAxisAlignItems);
 
-      // --- HATA DÜZELTMESİ ---
-      // Eğer kök (root) Auto-Layout ise, sabit genişlik/yükseklik yerine
-      // esnek olmasını (veya Figma'daki ayara uymasını) sağlamalıyız.
+      // --- DÜZELTİLMİŞ GENİŞLİK MANTIĞI ---
       if (rootNode.layoutSizingHorizontal === 'HUG') {
-        styles['width'] = 'auto';
-        styles['margin'] = 'auto'; // 'auto' ise ortala
-      } else if (rootNode.absoluteBoundingBox) {
-         styles['width'] = `${rootNode.absoluteBoundingBox.width}px`; // Genellikle 'FIXED' veya 'FILL'
-         styles['margin'] = 'auto';
+        styles['width'] = 'auto'; // İçeriğe göre sar
+      } else if (rootNode.layoutSizingHorizontal === 'FIXED') {
+        styles['width'] = `${rootNode.absoluteBoundingBox.width}px`; // Sabit
+      } else { // 'FILL'
+        styles['width'] = '100%'; // Ebeveyni doldur (veya %100 ol)
       }
 
-      // Auto-Layout'ta yükseklik genelde içerik tarafından belirlenir ('HUG')
-      // veya ebeveyne göre 'FILL' olur. Sabit 'height' uygulamak genellikle yanlıştır.
+      // --- DÜZELTİLMİŞ YÜKSEKLİK MANTIĞI ---
       if (rootNode.layoutSizingVertical === 'HUG') {
-          styles['height'] = 'auto';
+          styles['height'] = 'auto'; // İçeriğe göre sar
       } else if (rootNode.layoutSizingVertical === 'FIXED') {
-           styles['height'] = `${rootNode.absoluteBoundingBox.height}px`;
+           styles['height'] = `${rootNode.absoluteBoundingBox.height}px`; // Sabit
+      } else { // 'FILL'
+          // Kök öğe 'FILL' ise, genellikle tüm ekranı kaplamasını isteriz
+          styles['min-height'] = '100vh'; 
       }
-      // 'FILL' ise 'height' ayarlanmaz, 'align-self: stretch' (varsayılan) ile çözülür.
 
   } else if (rootNode.absoluteBoundingBox) {
-      // Auto-Layout DEĞİLSE (ByNoGame gibi), sabit boyutları uygula
+      // --- Auto-Layout DEĞİLSE (ByNoGame Projesi gibi) ---
+      // Sabit boyutları uygula
       styles['width'] = `${rootNode.absoluteBoundingBox.width}px`;
       styles['height'] = `${rootNode.absoluteBoundingBox.height}px`;
-      styles['margin'] = 'auto'; 
   }
   
   return styles;
 }
+// --- getRootStyles FONKSİYONU SONU ---
 
 
 function traverse(node, isParentAutoLayout, parentLayoutMode, parentBox, autoLayoutParentBox = null) { 
@@ -165,24 +168,24 @@ function traverse(node, isParentAutoLayout, parentLayoutMode, parentBox, autoLay
 
   if (isParentAutoLayout) {
     
-    // --- YENİ KONTROL: Auto-Layout içindeki mutlak konumlandırma ---
-    // Figma'da bir öğe Auto-Layout içindeyken "Absolute Position" olarak ayarlanabilir.
+    // --- Auto-Layout içindeki mutlak konumlandırma ---
     if (node.layoutPositioning === 'ABSOLUTE') {
       styles['position'] = 'absolute';
       
       // Koordinatlar en yakın Auto-Layout ebeveynine (autoLayoutParentBox) göre olmalıdır.
-      const refBox = autoLayoutParentBox || parentBox; 
+      // DÜZELTME: refBox her zaman 'parentBox' olmalıdır.
+      const refBox = parentBox; 
       
       styles['left'] = `${box.x - (refBox ? refBox.x : 0)}px`;
       styles['top'] = `${box.y - (refBox ? refBox.y : 0)}px`;
       styles['width'] = `${box.width}px`;
       styles['height'] = `${box.height}px`;
     } else {
-      // --- MEVCUT MANTIK (Normal Auto-Layout akışı) ---
+      // --- Normal Auto-Layout akışı ---
       styles['position'] = 'relative'; 
       if (node.layoutSizingHorizontal === 'FILL') {
         styles['flex-grow'] = '1';
-        styles['width'] = 'auto'; // Genişliğin flex-grow tarafından belirlenmesine izin ver
+        styles['width'] = 'auto'; 
       } else if (node.layoutSizingHorizontal === 'HUG') {
         styles['width'] = 'auto'; 
       } else { // FIXED
@@ -193,7 +196,7 @@ function traverse(node, isParentAutoLayout, parentLayoutMode, parentBox, autoLay
         if (node.layoutAlign !== 'STRETCH') {
            styles['align-self'] = 'stretch';
         }
-        styles['height'] = 'auto'; // Yüksekliğin esnemesine izin ver
+        styles['height'] = 'auto'; 
       } else if (node.layoutSizingVertical === 'HUG') {
         styles['height'] = 'auto'; 
       } else { // FIXED
@@ -232,8 +235,16 @@ function traverse(node, isParentAutoLayout, parentLayoutMode, parentBox, autoLay
     styles['padding'] = `${node.paddingTop || 0}px ${node.paddingRight || 0}px ${node.paddingBottom || 0}px ${node.paddingLeft || 0}px`; 
     styles['justify-content'] = mapAlign(node.primaryAxisAlignItems);
     styles['align-items'] = mapAlign(node.counterAxisAlignItems);
-    if(node.layoutSizingHorizontal === 'HUG') styles['width'] = 'auto';
-    if(node.layoutSizingVertical === 'HUG') styles['height'] = 'auto';
+    
+    // DÜZELTME: 'HUG' (Sarma) ise, flex-grow'u engelle
+    if(node.layoutSizingHorizontal === 'HUG') {
+        styles['width'] = 'auto';
+        styles['flex-grow'] = '0';
+    }
+    if(node.layoutSizingVertical === 'HUG') {
+       styles['height'] = 'auto';
+       styles['flex-grow'] = '0';
+    }
   }
   if (node.fills && node.fills[0] && node.fills[0].type === 'SOLID') {
     if (node.type !== 'TEXT') styles['background-color'] = rgba(node.fills[0].color);
@@ -292,7 +303,6 @@ function traverse(node, isParentAutoLayout, parentLayoutMode, parentBox, autoLay
   let html = `<${tag} ${attributes}>`;
 
   if (hasChildren) {
-    // --- DÜZELTME: autoLayoutParentBox doğru şekilde aktarılmalı ---
     const newAutoLayoutParentBox = isThisNodeAutoLayout ? box : autoLayoutParentBox;
     node.children.forEach(child => {
         html += traverse(
